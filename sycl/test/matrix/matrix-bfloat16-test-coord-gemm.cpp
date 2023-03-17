@@ -49,7 +49,6 @@ std::tuple<uint32_t, uint32_t> get_coord_ref(int i, int wi_number) {
 
 float sum_rows[MATRIX_M] = {0};
 
-
 template <typename T1, typename T2, size_t M, size_t N, size_t K>
 void matrix_multiply(big_matrix<T1, M, N> &C, big_matrix<T2, M, K> &A,
                      big_matrix<T2, K / 2, N * 2> &B) {
@@ -70,10 +69,9 @@ void matrix_multiply(big_matrix<T1, M, N> &C, big_matrix<T2, M, K> &A,
      auto v = sum_rows_v.get_access<access::mode::read_write>(cgh);
      auto os = sycl::stream(100000, 6144, cgh);
 
-
      cgh.parallel_for<class imatrix>(
-         nd_range<2>({NDRangeM, NDRangeN * SG_SZ}, {1, 1 * SG_SZ}),
-         [=](nd_item<2> spmd_item) [[intel::reqd_sub_group_size(SG_SZ)]]
+         nd_range<2>({NDRangeM, NDRangeN * SG_SZ}, {1, 1 * SG_SZ}), [=
+     ](nd_item<2> spmd_item) [[intel::reqd_sub_group_size(SG_SZ)]]
 
          {
            // The submatrix API has to be accessed by all the workitems in a
@@ -113,16 +111,18 @@ void matrix_multiply(big_matrix<T1, M, N> &C, big_matrix<T2, M, K> &A,
                               N, layout::row_major);
 
            float sum_local_rows[M] = {0}; // 8 local rows, M total
-           auto data = sycl::ext::intel::experimental::matrix::get_wi_data(sg, sub_c);
+           auto data =
+               sycl::ext::intel::experimental::matrix::get_wi_data(sg, sub_c);
 
            // Keep track of rows handled in this WI
-          int32_t handled_rows[M] = {-1};
-          size_t global_index; // Index into the result array that holds the sums.
-
+           int32_t handled_rows[M] = {-1};
+           size_t
+               global_index; // Index into the result array that holds the sums.
 
            for (int i = 0; i < data.length(); ++i) {
              auto dataItem = data[i];
-             auto [row, col] = sycl::ext::intel::experimental::matrix::get_coord(dataItem);
+             auto [row, col] =
+                 sycl::ext::intel::experimental::matrix::get_coord(dataItem);
              // get_coord_ref(i, spmd_item.get_local_id(1));
              global_index = row + global_idx * TM;
 
@@ -131,24 +131,23 @@ void matrix_multiply(big_matrix<T1, M, N> &C, big_matrix<T2, M, K> &A,
              handled_rows[global_index] = 1;
            }
 
-           for (int j=0; j < M; j++) {
-              if (handled_rows[j] == 1) {
-                global_index = j;
-                sum_local_rows[global_index] = reduce_over_group(
-                    sg, sum_local_rows[global_index],
-                    sycl::plus<>());
-                // only Groups leader perform the global reduction
-                if (global_idy % SG_SZ == 0) {
-                  sycl::atomic_ref<float, sycl::memory_order::relaxed,
-                                                                      sycl::memory_scope::device> aref(v[global_index]);
-                  aref.fetch_add(sum_local_rows[global_index]);
-                }
-              }
-          }
+           for (int j = 0; j < M; j++) {
+             if (handled_rows[j] == 1) {
+               global_index = j;
+               sum_local_rows[global_index] = reduce_over_group(
+                   sg, sum_local_rows[global_index], sycl::plus<>());
+               // only Groups leader perform the global reduction
+               if (global_idy % SG_SZ == 0) {
+                 sycl::atomic_ref<float, sycl::memory_order::relaxed,
+                                  sycl::memory_scope::device>
+                     aref(v[global_index]);
+                 aref.fetch_add(sum_local_rows[global_index]);
+               }
+             }
+           }
          }); // parallel for
    }).wait();
 }
-
 
 bfloat16 A[MATRIX_M][MATRIX_K];
 bfloat16 B[MATRIX_K / 2][MATRIX_N * 2];
@@ -216,7 +215,7 @@ int main() {
       sum_rows_ref[i] += C[i][j];
     }
     if ((fabs(sum_rows_ref[i]) - fabs(sum_rows[i])) > BF16_EPSILON)
-        res = false;
+      res = false;
     // std::cout << "\n";
   }
   std::cout << (res ? "passed" : "failed") << std::endl;

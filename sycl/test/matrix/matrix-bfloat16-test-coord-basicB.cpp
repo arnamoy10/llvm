@@ -154,51 +154,50 @@ void matrix_sum_cols(queue q, big_matrix<T, M, N> &B, nd_range<2> &r) {
            ext::oneapi::sub_group sg = spmd_item.get_sub_group();
 
            // TK = 32, TN = 16
-          joint_matrix<sub_group, int8_t, use::b, TK, TN,
+           joint_matrix<sub_group, int8_t, use::b, TK, TN,
                         ext::intel::experimental::matrix::layout::packed>
                sub_b;
 
-          joint_matrix_load(sg, sub_b,
+           joint_matrix_load(sg, sub_b,
                              accB.get_pointer() + (global_idx * (TK / 4) * N) +
                                  sg_starty / SG_SZ * TN * 4,
                              N);
-           
-           
-           
+
            int32_t sum_local_cols[N] = {0}; // 4 local cols, N total
            // sub_b has 32x16 elements, 32 elements per WI, 4 per WI per row
-          auto wiData = sycl::ext::intel::experimental::matrix::get_wi_data(sg, sub_b);
+           auto wiData =
+               sycl::ext::intel::experimental::matrix::get_wi_data(sg, sub_b);
 
-          size_t global_index; // Index into the result array that holds the sums.
+           size_t
+               global_index; // Index into the result array that holds the sums.
 
            // Keep track of cols handled in this WI
-          int32_t handled_cols[N] = {-1};
+           int32_t handled_cols[N] = {-1};
 
-          //  each WI calculates local sum of cols
-          for (int i = 0; i < wiData.length(); ++i) {
-            // get the index of the element in the submatrix
-            auto dataItem = wiData[i];
-            auto [row, col] = sycl::ext::intel::experimental::matrix::get_coord(dataItem);
-            
-            // Calculation of global index
-            int sg_idx= (int)global_idy/SG_SZ;
-            global_index = col + sg_idx*4/*VNNI_FACTOR*/*SG_SZ;
-            sum_local_cols[global_index] += wiData[i];
-            handled_cols[global_index] = 1;
-          }
+           //  each WI calculates local sum of cols
+           for (int i = 0; i < wiData.length(); ++i) {
+             // get the index of the element in the submatrix
+             auto dataItem = wiData[i];
+             auto [row, col] =
+                 sycl::ext::intel::experimental::matrix::get_coord(dataItem);
 
-          for (int j=0; j < N; j++) {
-              if (handled_cols[j] == 1) {
-                global_index = j;
-                sum_local_cols[global_index] = reduce_over_group(
-                    sg, sum_local_cols[global_index],
-                    sycl::plus<>());
-                // TODO: Do we need a reduce_over_grp? Adding it does not
-                // make any difference in result
-                atomic_fetch_add(v[global_index],
-                                  sum_local_cols[global_index]);
-              }
-          }
+             // Calculation of global index
+             int sg_idx = (int)global_idy / SG_SZ;
+             global_index = col + sg_idx * 4 /*VNNI_FACTOR*/ * SG_SZ;
+             sum_local_cols[global_index] += wiData[i];
+             handled_cols[global_index] = 1;
+           }
+
+           for (int j = 0; j < N; j++) {
+             if (handled_cols[j] == 1) {
+               global_index = j;
+               sum_local_cols[global_index] = reduce_over_group(
+                   sg, sum_local_cols[global_index], sycl::plus<>());
+               // TODO: Do we need a reduce_over_grp? Adding it does not
+               // make any difference in result
+               atomic_fetch_add(v[global_index], sum_local_cols[global_index]);
+             }
+           }
          }); // parallel for
    }).wait();
   sum_cols_ref<T, M, N>(bufB.get_host_access(), sum_cols_v.get_host_access());

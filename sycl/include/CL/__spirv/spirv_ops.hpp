@@ -108,7 +108,8 @@ __spirv_CompositeConstruct(const T v);
 template <typename T, std::size_t R, std::size_t C, __spv::MatrixUse U,
           __spv::MatrixLayout L = __spv::MatrixLayout::RowMajor,
           __spv::Scope::Flag S = __spv::Scope::Flag::Subgroup>
-extern __DPCPP_SYCL_EXTERNAL __ocl_vec_t<uint32_t, 2> __spirv_JointMatrixGetElementCoordINTEL(
+extern __DPCPP_SYCL_EXTERNAL __ocl_vec_t<uint32_t, 2>
+__spirv_JointMatrixGetElementCoordINTEL(
     __spv::__spirv_JointMatrixINTEL<T, R, C, L, S, U> *, size_t i);
 
 template <typename T, std::size_t R, std::size_t C, __spv::MatrixUse U,
